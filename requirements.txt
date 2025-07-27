@@ -1,0 +1,6 @@
+opencv-python-headless==4.8.0.76
+mediapipe==0.10.21
+tensorflow==2.18.0
+numpy==1.26.4
+flask==2.3.3
+flask-cors==4.0.0
