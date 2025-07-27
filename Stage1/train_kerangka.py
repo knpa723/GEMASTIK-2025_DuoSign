@@ -2,11 +2,12 @@ import os
 import cv2
 import numpy as np
 import matplotlib.pyplot as plt
-from tensorflow.keras.models import Sequential
-from tensorflow.keras.layers import Dense, GlobalAveragePooling2D
-from tensorflow.keras.applications import MobileNetV2
-from tensorflow.keras.preprocessing.image import ImageDataGenerator
-from tensorflow.keras.callbacks import EarlyStopping, ModelCheckpoint
+from tensorflow import keras
+from keras.models import Sequential
+from keras.layers import Dense, GlobalAveragePooling2D
+from keras.applications import MobileNetV2
+from keras.preprocessing.image import ImageDataGenerator
+from keras.callbacks import EarlyStopping, ModelCheckpoint
 
 # Set ukuran gambar input untuk model
 IMAGE_SIZE = (224, 224)
