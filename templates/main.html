@@ -1,0 +1,34 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>DuoSign: Club BEJO</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='main.css') }}">
+</head>
+<body>
+    <div class="container">
+        <h1>DuoSign: Club BEJO</h1>
+
+        <div class="video-box">
+            <img src="{{ url_for('static', filename='uploads/frame.jpg') }}" alt="Preview Frame">
+        </div>
+
+        <div class="text-box">
+            <input type="text" placeholder="Hasil kalimat....." id="resultText" readonly>
+        </div>
+
+        <div class="bottom-row">
+            <div class="status-box">
+                <input type="text" placeholder="Label Prediksi..." id="resultLabel" readonly>
+            </div>
+            <form method="post" action="/start">
+                <button type="submit" class="start-btn">Mulai</button>
+            </form>
+
+            <form method="post" action="/stop" id="stopForm" style="display: none;">
+                <button type="submit" class="stop-btn">STOP</button>
+            </form>
+        </div>
+    </div>
+</body>
+</html>
