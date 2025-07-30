@@ -4,21 +4,23 @@ from Stage1.spatial import extract_features_from_frame
 from keras.models import load_model
 
 # Load model gesture
-model = load_model('Stage1/mobilenet_gesture_model.h5')
-label_map = {
-    0: 'Buka',
-    1: 'Bukti',
-    2: 'Cacat',
-    3: 'Cara',
-    4: 'Cari',
-    5: 'Cepat',
-    6: 'Daftar'
-             }
+model = load_model('Stage1/spatial_attention_model.h5')
 
-# Buka webcam
-cap = cv2.VideoCapture(0)
+# Load label map dari file txt
+label_map = {}
+with open("Stage1/label_map.txt", "r", encoding="utf-8") as f:
+    for line in f:
+        key, value = line.strip().split(": ")
+        label_map[int(key)] = value
+
+# Buka webcam atau video
+cap = cv2.VideoCapture('Ada.webm')
 cap.set(cv2.CAP_PROP_FRAME_WIDTH, 1920)
 cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 1080)
+
+if not cap.isOpened():
+    print("Kamera tidak bisa dibuka.")
+    exit()
 
 while True:
     ret, frame = cap.read()
@@ -28,8 +30,8 @@ while True:
 
     features = extract_features_from_frame(frame)
 
-    if features is not None and features.shape[0] == 258:
-        input_data = np.expand_dims(features, axis=0)  # (1, 258)
+    if features is not None and features.shape[0] == 320:
+        input_data = np.expand_dims(features, axis=0)  # Bentuk: (1, 320)
         prediction = model.predict(input_data, verbose=0)[0]
         pred_label = np.argmax(prediction)
         confidence = float(np.max(prediction))
