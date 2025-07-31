@@ -3,9 +3,8 @@ import torch
 from symspellpy import SymSpell, Verbosity
 from transformers import AutoTokenizer, AutoModelForSeq2SeqLM
 from functools import lru_cache
-# from TTS.api import TTS  # Uncomment jika ingin pakai TTS
 
-# ========== Step 1: Setup Rephrasing Model (IndoT5 / IndoBART) ==========
+# ========== Step 1: Setup Rephrasing Model ==========
 model_name = "cahya/t5-base-indonesian-summarization-cased"
 tokenizer = AutoTokenizer.from_pretrained(model_name, legacy=False)
 model = AutoModelForSeq2SeqLM.from_pretrained(model_name)
@@ -45,7 +44,7 @@ def rephrase_sentence(text):
         outputs = model.generate(
             inputs["input_ids"],
             max_length=128,
-            num_beams=3,  # Kurangi beam untuk kecepatan
+            num_beams=3,
             early_stopping=True,
             no_repeat_ngram_size=3,
             repetition_penalty=1.5
@@ -54,19 +53,32 @@ def rephrase_sentence(text):
 
 # ========== Step 5: Fungsi Utama ==========
 def main():
+    current_text = ""
+    print("=== Rephraser & Spell Corrector Bahasa Indonesia ===")
+    print("Ketik tambahan kata, atau 'reset' untuk mengosongkan, 'exit' untuk keluar.\n")
+
     while True:
-        user_input = input("\n📝 Masukkan kata-kata acak atau typo (contoh: saya jual mangga pasr maniss): ").strip()
-        if user_input.lower() in ['exit', 'quit']:
+        tambahan = input("➕ Tambahan teks: ").strip()
+
+        if tambahan.lower() in ['exit', 'quit']:
             print("❌ Keluar dari program.")
             break
+        elif tambahan.lower() == 'reset':
+            current_text = ""
+            print("🔄 Teks telah direset.\n")
+            continue
+
+        # Tambahkan input ke current_text
+        current_text += " " + tambahan
+        current_text = current_text.strip()
 
         print("\n[1️⃣] Koreksi Ejaan...")
-        fixed_spelling = correct_spelling(user_input)
-        print(f"Hasil koreksi ejaan: {fixed_spelling}")
+        fixed_spelling = correct_spelling(current_text)
+        print(f"📝 Setelah koreksi: {fixed_spelling}")
 
         print("\n[2️⃣] Susun Ulang Kalimat...")
         rephrased = rephrase_sentence(fixed_spelling)
-        print(f"Hasil kalimat akhir: {rephrased}")
+        print(f"✅ Kalimat akhir: {rephrased}\n")
 
 # ========== Jalankan Program ==========
 if __name__ == "__main__":
