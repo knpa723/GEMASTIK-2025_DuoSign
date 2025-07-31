@@ -1,6 +1,23 @@
 opencv-python-headless==4.8.0.76
-mediapipe==0.10.21
-tensorflow==2.18.0
 numpy==1.26.4
 flask==2.3.3
 flask-cors==4.0.0
+ultralytics
+
+# ==== PyTorch Requirements ====
+torch==2.7.1
+torchaudio==2.7.1
+
+# === NLP & Transformers ===
+transformers==4.54.0
+tokenizers==0.21.2
+
+# === SymSpell Spell Correction ===
+symspellpy==6.9.0
+
+# === Optional: TTS (Coqui TTS jika ingin aktifkan TTS) ===
+#TTS==0.22.0  # Uncomment jika ingin pakai TTS dari Coqui
+
+# === Sistem Utility (opsional, tapi direkomendasikan untuk stabilitas IO/CLI) ===
+#tqdm==4.67.1
+
