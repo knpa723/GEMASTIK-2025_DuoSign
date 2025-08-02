@@ -2,33 +2,29 @@ from flask import Flask, render_template, Response, request, jsonify
 import cv2
 import numpy as np
 import time
-from Stage1.spatial import extract_features_from_frame
-from tensorflow import keras
-from keras.models import load_model
 import threading
+from Stage1.spatial import extract_features_from_frame
+from tensorflow.keras.models import load_model
 
 app = Flask(__name__)
 
-# Load model dan label
 model = load_model('best_model.h5')
-
-label_map = {}
 label_map = np.load("label_map.npy", allow_pickle=True).item()
 
-
-# Video capture global
+# Global variabel
 cap = None
 detecting = False
-
-# Buffer hasil deteksi
+frame_lock = threading.Lock()
+current_frame = None
+stream_thread = None
 detection_buffer = []
 last_detect_time = None
 result_lock = threading.Lock()
-
 latest_result = {"label": "", "confidence": 0.0}
 
+
 def classify_and_stream():
-    global cap, detecting, detection_buffer, last_detect_time, latest_result
+    global cap, detecting, current_frame, detection_buffer, last_detect_time, latest_result
 
     cap = cv2.VideoCapture(0)
     cap.set(cv2.CAP_PROP_FRAME_WIDTH, 1280)
@@ -38,6 +34,9 @@ def classify_and_stream():
         ret, frame = cap.read()
         if not ret:
             break
+
+        with frame_lock:
+            current_frame = frame.copy()
 
         features = extract_features_from_frame(frame)
         current_time = time.time()
@@ -60,58 +59,81 @@ def classify_and_stream():
                 if len(detection_buffer) >= 5:
                     send_to_stage2(detection_buffer.copy())
                     detection_buffer.clear()
-            else:
-                label_text = "Tidak yakin"
-
         else:
-            label_text = "Landmark tidak terdeteksi"
+            label_text = "Tidak yakin"
 
-        # Gap lebih dari 2 detik tanpa deteksi
         if last_detect_time and (current_time - last_detect_time > 2) and detection_buffer:
             send_to_stage2(detection_buffer.copy())
             detection_buffer.clear()
             last_detect_time = None
 
-        # Untuk debug stream (jika mau live feed di html)
-        _, jpeg = cv2.imencode('.jpg', frame)
-        frame_bytes = jpeg.tobytes()
-        yield (b'--frame\r\n'
-               b'Content-Type: image/jpeg\r\n\r\n' + frame_bytes + b'\r\n')
-
     if cap:
         cap.release()
+        cap = None
+    print("Kamera dimatikan")
+
 
 def send_to_stage2(sequence):
-    print(f"Sequence dikirim ke Stage2: {sequence}")
-    # Simulasi, bisa diganti dengan request ke endpoint Stage2
+    print(f"[Stage2] Sequence dikirim: {sequence}")
     # requests.post('http://stage2/endpoint', json={"sequence": sequence})
+
 
 @app.route('/')
 def index():
     return render_template('main.html')
 
+
 @app.route('/start', methods=['POST'])
 def start():
-    global detecting
+    global detecting, stream_thread
     if not detecting:
         detecting = True
-        threading.Thread(target=classify_and_stream, daemon=True).start()
-    return render_template('main.html')
+        stream_thread = threading.Thread(target=classify_and_stream, daemon=True)
+        stream_thread.start()
+    return '', 204
+
 
 @app.route('/stop', methods=['POST'])
 def stop():
-    global detecting
+    global detecting, cap, current_frame, detection_buffer
     detecting = False
-    return render_template('main.html')
+    detection_buffer.clear()
+    current_frame = None
+    time.sleep(0.5)
+    if cap:
+        cap.release()
+        cap = None
+    return '', 204
+
 
 @app.route('/detect')
 def detect():
-    return Response(classify_and_stream(), mimetype='multipart/x-mixed-replace; boundary=frame')
+    def generate():
+        while True:
+            if not detecting:
+                time.sleep(0.1)
+                continue
+
+            with frame_lock:
+                if current_frame is None:
+                    continue
+                frame = current_frame.copy()
+
+            _, jpeg = cv2.imencode('.jpg', frame)
+            yield (b'--frame\r\n'
+                   b'Content-Type: image/jpeg\r\n\r\n' + jpeg.tobytes() + b'\r\n')
+
+            time.sleep(0.05)
+
+    return Response(generate(), mimetype='multipart/x-mixed-replace; boundary=frame')
+
+
 
 @app.route('/status')
 def status():
     with result_lock:
         return jsonify(latest_result)
+
 
 if __name__ == '__main__':
     app.run(debug=True)
