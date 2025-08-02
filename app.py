@@ -4,7 +4,15 @@ import numpy as np
 import time
 import threading
 from Stage1.spatial import extract_features_from_frame
-from tensorflow.keras.models import load_model
+import os
+os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2'
+import absl.logging
+absl.logging.set_verbosity(absl.logging.ERROR)
+from tensorflow import keras
+from keras.models import load_model
+
+
+
 
 app = Flask(__name__)
 
@@ -35,33 +43,32 @@ def classify_and_stream():
         if not ret:
             break
 
+        current_time = time.time()
+
+        # ✅ Sudah sekaligus menggambar dan memprediksi
+        label_text, confidence, frame = extract_features_from_frame(frame, model, label_map)
+
+        frame = cv2.resize(frame, (1280, 720)) 
+
         with frame_lock:
             current_frame = frame.copy()
 
-        features = extract_features_from_frame(frame)
-        current_time = time.time()
+        with result_lock:
+            latest_result["label"] = label_text
+            latest_result["confidence"] = round(confidence, 2)
 
-        if features is not None and features.shape[0] == 320:
-            input_data = np.expand_dims(features, axis=0)
-            prediction = model.predict(input_data, verbose=0)[0]
-            pred_label = np.argmax(prediction)
-            confidence = float(np.max(prediction))
-            label_text = label_map.get(pred_label, "Unknown")
-
-            with result_lock:
-                latest_result["label"] = label_text
-                latest_result["confidence"] = round(confidence, 2)
-
-            if confidence > 0.7:
-                detection_buffer.append(label_text)
-                last_detect_time = current_time
-
-                if len(detection_buffer) >= 5:
-                    send_to_stage2(detection_buffer.copy())
-                    detection_buffer.clear()
+        # Lanjutkan buffer logika
+        if confidence > 0.7:
+            detection_buffer.append(label_text)
+            last_detect_time = current_time
+            if len(detection_buffer) >= 5:
+                send_to_stage2(detection_buffer.copy())
+                detection_buffer.clear()
         else:
+            # Untuk buffer logika saja, tidak menyentuh latest_result
             label_text = "Tidak yakin"
 
+        # ✅ Kirim otomatis setelah 2 detik
         if last_detect_time and (current_time - last_detect_time > 2) and detection_buffer:
             send_to_stage2(detection_buffer.copy())
             detection_buffer.clear()
@@ -71,6 +78,8 @@ def classify_and_stream():
         cap.release()
         cap = None
     print("Kamera dimatikan")
+
+
 
 
 def send_to_stage2(sequence):
@@ -132,6 +141,7 @@ def detect():
 @app.route('/status')
 def status():
     with result_lock:
+        print("DEBUG:", latest_result)  # Debug log ke console
         return jsonify(latest_result)
 
 
