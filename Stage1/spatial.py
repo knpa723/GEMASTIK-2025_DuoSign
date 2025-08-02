@@ -116,9 +116,24 @@ def extract_features_from_frame(frame_bgr, model, label_list):
                 class_id = int(np.argmax(pred))
                 confidence = float(np.max(pred))
 
-                if confidence > 0.99:
+                if confidence > 0.5:
                     label = label_list[class_id]
+                    
+                    # Tambahkan teks ke frame (pojok kiri atas)
+                    text = f"{label} ({confidence:.2f})"
+                    cv2.putText(
+                        frame_with_skeleton,
+                        text,
+                        (10, 40),  # posisi teks
+                        cv2.FONT_HERSHEY_SIMPLEX,
+                        1.2,            # ukuran font
+                        (0, 255, 0),    # warna hijau terang
+                        3,              # ketebalan
+                        cv2.LINE_AA
+                    )
+
                     return label, confidence, frame_with_skeleton
+
 
         # Jika tidak terdeteksi
         sequence.clear()
