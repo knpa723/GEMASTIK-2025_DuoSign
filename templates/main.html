@@ -21,7 +21,7 @@
             <div class="status-box">
                 <input type="text" placeholder="Label Prediksi..." id="resultLabel" readonly>
             </div>
-            <form method="post" action="/start">
+            <form method="post" action="/start" id="startForm">
                 <button type="submit" class="start-btn">Mulai</button>
             </form>
 
@@ -31,4 +31,32 @@
         </div>
     </div>
 </body>
+
+<script>
+document.getElementById("startForm").addEventListener("submit", function(e) {
+    e.preventDefault(); // Cegah reload halaman
+
+    fetch("/start", { method: "POST" })
+        .then(response => {
+            if (response.ok) {
+                document.getElementById("startForm").style.display = "none";
+                document.getElementById("stopForm").style.display = "block";
+            }
+        });
+});
+
+document.getElementById("stopForm").addEventListener("submit", function(e) {
+    e.preventDefault(); // Cegah reload halaman
+
+    fetch("/stop", { method: "POST" })
+        .then(response => {
+            if (response.ok) {
+                document.getElementById("stopForm").style.display = "none";
+                document.getElementById("startForm").style.display = "block";
+            }
+        });
+});
+</script>
+
+
 </html>
