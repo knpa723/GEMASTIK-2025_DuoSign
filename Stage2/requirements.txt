@@ -10,7 +10,7 @@ tokenizers==0.21.2
 symspellpy==6.9.0
 
 # === Optional: TTS (Coqui TTS jika ingin aktifkan TTS) ===
-TTS==0.22.0  # Uncomment jika ingin pakai TTS dari Coqui
+# TTS==0.22.0  # Uncomment jika ingin pakai TTS dari Coqui
 
 # === Sistem Utility (opsional, tapi direkomendasikan untuk stabilitas IO/CLI) ===
 tqdm==4.67.1

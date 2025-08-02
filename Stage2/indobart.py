@@ -1,22 +1,22 @@
 import os
 import torch
 from symspellpy import SymSpell, Verbosity
-from transformers import AutoTokenizer, AutoModelForSeq2SeqLM
+from transformers import AutoModelForSeq2SeqLM, AutoTokenizer
+from indobenchmark import IndoNLGTokenizer
 from functools import lru_cache
 
-import os
-os.environ["TRANSFORMERS_NO_TF"] = "1" # Disable TensorFlow in Transformers
-os.environ["TF_CPP_MIN_LOG_LEVEL"] = "3" # Suppress TensorFlow warnings in logging
+# Setup Environment
+os.environ["TRANSFORMERS_NO_TF"] = "1"
+os.environ["TF_CPP_MIN_LOG_LEVEL"] = "3"
 
-
-# ========== Step 1: Setup Rephrasing Model ==========
-model_name = "cahya/t5-base-indonesian-summarization-cased"
-tokenizer = AutoTokenizer.from_pretrained(model_name, legacy=False)
+# ======= Step 1: Setup IndoBART Model =========
+model_name = "indobenchmark/indobart"
+tokenizer = IndoNLGTokenizer.from_pretrained(model_name, use_fast=False)
 model = AutoModelForSeq2SeqLM.from_pretrained(model_name)
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 model = model.to(device)
 
-# ========== Step 2: Lazy Spell Correction Setup ==========
+# ======= Step 2: Lazy Spell Correction (SymSpell) =========
 sym_spell = None
 dictionary_path = "Stage2/dictionary/frequency_dictionary_hundred.txt"
 
@@ -27,7 +27,7 @@ def lazy_load_symspell():
         sym_spell = SymSpell(max_dictionary_edit_distance=2, prefix_length=7)
         sym_spell.load_dictionary(dictionary_path, term_index=0, count_index=1)
 
-# ========== Step 3: Koreksi Ejaan ==========
+# ======= Step 3: Koreksi Ejaan =========
 @lru_cache(maxsize=128)
 def correct_spelling(text):
     lazy_load_symspell()
@@ -39,27 +39,37 @@ def correct_spelling(text):
         corrected.append(corrected_word)
     return " ".join(corrected)
 
-# ========== Step 4: Koreksi Grammar & Susun Ulang ==========
+# ======= Step 4: Grammar Correction dengan IndoBART =========
 @lru_cache(maxsize=128)
-def rephrase_sentence(text):
-    prompt = f"Hasil rephrase kalimat: \n{text}"
-    inputs = tokenizer(prompt, return_tensors="pt").to(device)
+def correct_grammar(text: str) -> str:
+    text_with_lang_token = f"<ind> {text}"
 
-    with torch.no_grad():
-        outputs = model.generate(
-            inputs["input_ids"],
-            max_length=128,
-            num_beams=3,
-            early_stopping=True,
-            no_repeat_ngram_size=3,
-            repetition_penalty=1.5
-        )
-    return tokenizer.decode(outputs[0], skip_special_tokens=True)
+    inputs = tokenizer(
+        text_with_lang_token,
+        return_tensors="pt",
+        truncation=True,
+        # padding="max_length",
+        max_length=128
+    )
 
-# ========== Step 5: Fungsi Utama ==========
+    input_ids = inputs["input_ids"].to(device)
+    attention_mask = inputs["attention_mask"].to(device)
+
+    outputs = model.generate(
+        input_ids=input_ids,
+        attention_mask=attention_mask,
+        max_length=128,
+        num_beams=5,
+        early_stopping=True
+    )
+
+    corrected = tokenizer.decode(outputs[0], skip_special_tokens=True)
+    return corrected
+
+# ======= Step 5: Fungsi Utama =========
 def main():
     current_text = ""
-    print("=== Rephraser & Spell Corrector Bahasa Indonesia ===")
+    print("=== Spell & Grammar Corrector Bahasa Indonesia ===")
     print("Ketik tambahan kata, atau 'reset' untuk mengosongkan, 'exit' untuk keluar.\n")
 
     while True:
@@ -73,7 +83,6 @@ def main():
             print("🔄 Teks telah direset.\n")
             continue
 
-        # Tambahkan input ke current_text
         current_text += " " + tambahan
         current_text = current_text.strip()
 
@@ -81,10 +90,10 @@ def main():
         fixed_spelling = correct_spelling(current_text)
         print(f"{fixed_spelling}")
 
-        print("\n[2️⃣] Susun Ulang Kalimat...")
-        rephrased = rephrase_sentence(fixed_spelling)
-        print(f"{rephrased}\n")
+        print("\n[2️⃣] Koreksi Grammar & Susun Kalimat...")
+        fixed_grammar = correct_grammar(fixed_spelling)
+        print(f"{fixed_grammar}\n")
 
-# ========== Jalankan Program ==========
+# ======= Jalankan Program =========
 if __name__ == "__main__":
     main()
