@@ -88,53 +88,48 @@ def draw_landmarks_only_pose_and_hands(image, results):
 
 
 # === Fungsi utama untuk dipanggil dari app.py ===
-def extract_features_from_frame(frame_bgr, model, label_list):
-    with mp_holistic.Holistic(
-        min_detection_confidence=0.5,
-        min_tracking_confidence=0.5
-    ) as holistic:
+def extract_features_from_frame(frame_bgr, model, label_list, holistic):
+    global sequence
+    rgb = cv2.cvtColor(frame_bgr, cv2.COLOR_BGR2RGB)
+    rgb.flags.writeable = False
+    results = holistic.process(rgb)
+    rgb.flags.writeable = True
 
-        rgb = cv2.cvtColor(frame_bgr, cv2.COLOR_BGR2RGB)
-        rgb.flags.writeable = False
-        results = holistic.process(rgb)
-        rgb.flags.writeable = True
+    frame_with_skeleton = draw_landmarks_only_pose_and_hands(frame_bgr, results)
+    frame_with_skeleton = cv2.flip(frame_with_skeleton, 1)
+    # Check keberadaan landmark untuk proses prediksi
+    if (
+        results.pose_landmarks or
+        (results.left_hand_landmarks or
+        results.right_hand_landmarks)
+    ):
+        feature_vector = extract_features(results)
+        sequence.append(feature_vector)
+        if len(sequence) == MAX_SEQ_LENGTH:
+            input_data = np.expand_dims(np.array(sequence), axis=0)
+            pred = model.predict(input_data, verbose=0)[0]
+            class_id = int(np.argmax(pred))
+            confidence = float(np.max(pred))
 
-        frame_with_skeleton = draw_landmarks_only_pose_and_hands(frame_bgr, results)
+            if confidence > 0.9:
+                label = label_list[class_id]
+                
+                # Tambahkan teks ke frame (pojok kiri atas)
+                text = f"{label} ({confidence:.2f})"
+                cv2.putText(
+                    frame_with_skeleton,
+                    text,
+                    (10, 40),  # posisi teks
+                    cv2.FONT_HERSHEY_SIMPLEX,
+                    1.2,            # ukuran font
+                    (0, 255, 0),    # warna hijau terang
+                    3,              # ketebalan
+                    cv2.LINE_AA
+                )
 
-        # Check keberadaan landmark untuk proses prediksi
-        if (
-            results.pose_landmarks or
-            results.left_hand_landmarks or
-            results.right_hand_landmarks
-        ):
-            feature_vector = extract_features(results)
-            sequence.append(feature_vector)
-
-            if len(sequence) == MAX_SEQ_LENGTH:
-                input_data = np.expand_dims(np.array(sequence), axis=0)
-                pred = model.predict(input_data, verbose=0)[0]
-                class_id = int(np.argmax(pred))
-                confidence = float(np.max(pred))
-
-                if confidence > 0.5:
-                    label = label_list[class_id]
-                    
-                    # Tambahkan teks ke frame (pojok kiri atas)
-                    text = f"{label} ({confidence:.2f})"
-                    cv2.putText(
-                        frame_with_skeleton,
-                        text,
-                        (10, 40),  # posisi teks
-                        cv2.FONT_HERSHEY_SIMPLEX,
-                        1.2,            # ukuran font
-                        (0, 255, 0),    # warna hijau terang
-                        3,              # ketebalan
-                        cv2.LINE_AA
-                    )
-
-                    return label, confidence, frame_with_skeleton
+                return label, confidence, frame_with_skeleton
 
 
-        # Jika tidak terdeteksi
-        sequence.clear()
-        return None, 0.0, frame_with_skeleton
+    # Jika tidak terdeteksi
+    #sequence.clear()
+    return None, 0.0, frame_with_skeleton

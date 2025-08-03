@@ -1,16 +1,17 @@
+import os
+os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
+os.environ['TF_ENABLE_ONEDNN_OPTS'] = '0'
 from flask import Flask, render_template, Response, request, jsonify
 import cv2
 import numpy as np
 import time
 import threading
 from Stage1.spatial import extract_features_from_frame
-import os
-os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2'
 import absl.logging
 absl.logging.set_verbosity(absl.logging.ERROR)
 from tensorflow import keras
 from keras.models import load_model
-
+import mediapipe as mp
 
 
 
@@ -18,6 +19,7 @@ app = Flask(__name__)
 
 model = load_model('best_model.h5')
 label_map = np.load("label_map.npy", allow_pickle=True).item()
+rev_label_map = {v: k for k, v in label_map.items()}
 
 # Global variabel
 cap = None
@@ -30,26 +32,32 @@ last_detect_time = None
 result_lock = threading.Lock()
 latest_result = {"label": "", "confidence": 0.0}
 
-
+mp_holistic = mp.solutions.holistic
 def classify_and_stream():
-    global cap, detecting, current_frame, detection_buffer, last_detect_time, latest_result
+    global cap, detecting, current_frame, detection_buffer, last_detect_time, latest_result, mp_holistic
+
+    frame_interval = 0.2  # seconds between processing (5 FPS)
+    last_frame_time = 0
 
     cap = cv2.VideoCapture(0)
-    cap.set(cv2.CAP_PROP_FRAME_WIDTH, 1280)
-    cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 720)
+    cap.set(cv2.CAP_PROP_FRAME_WIDTH, 960)
+    cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 540)
 
+    holistic = mp_holistic.Holistic(
+    min_detection_confidence=0.5,
+    min_tracking_confidence=0.5
+    )
     while detecting and cap.isOpened():
         ret, frame = cap.read()
         if not ret:
             break
-
         current_time = time.time()
-
+        
         # ✅ Sudah sekaligus menggambar dan memprediksi
-        label_text, confidence, frame = extract_features_from_frame(frame, model, label_map)
+        label_text, confidence, frame = extract_features_from_frame(frame, model, rev_label_map, holistic)
 
-        frame = cv2.resize(frame, (1280, 720)) 
-
+        # Just show frame without running inference
+        frame = cv2.resize(frame, (960, 540)) 
         with frame_lock:
             current_frame = frame.copy()
 
@@ -108,7 +116,7 @@ def stop():
     detecting = False
     detection_buffer.clear()
     current_frame = None
-    time.sleep(0.5)
+    time.sleep(0.01)
     if cap:
         cap.release()
         cap = None
@@ -140,6 +148,7 @@ def detect():
 
 @app.route('/status')
 def status():
+    global latest_result
     with result_lock:
         print("DEBUG:", latest_result)  # Debug log ke console
         return jsonify(latest_result)
