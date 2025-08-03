@@ -58,9 +58,12 @@
     });
 
     const resultLabelInput = document.getElementById("resultLabel");
+    const resultTextInput = document.getElementById("resultText");
+
 
     let lastLabel = null;
     let lastConfidence = null;
+    let lastSentence = null;
 
     function updateStatusBox() {
         fetch("/status")
@@ -84,8 +87,26 @@
             });
     }
 
+    function updateFinalResult() {
+        fetch("/final_result")
+            .then(res => res.json())
+            .then(data => {
+                if (!data || typeof data.rephrased !== "string") return;
+
+                const sentence = data.rephrased.trim();
+                if (sentence !== lastSentence) {
+                    lastSentence = sentence;
+                    resultTextInput.value = sentence;
+                }
+            })
+            .catch(err => {
+                console.error("Gagal ambil final_result:", err);
+            });
+    }
+
     // Jalankan polling setiap 300ms
     setInterval(updateStatusBox, 300);
+    setInterval(updateFinalResult, 500);
 
 </script>
 

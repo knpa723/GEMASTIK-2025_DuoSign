@@ -13,6 +13,7 @@ from tensorflow import keras
 from keras.models import load_model
 import mediapipe as mp
 
+from Stage2.symspell_gemini import correct_spelling, rephrase_sentence
 
 
 app = Flask(__name__)
@@ -31,17 +32,17 @@ detection_buffer = []
 last_detect_time = None
 result_lock = threading.Lock()
 latest_result = {"label": "", "confidence": 0.0}
-
 mp_holistic = mp.solutions.holistic
+
+final_result = {"original": "", "corrected": "", "rephrased": ""}
+final_result_lock = threading.Lock()  
+
 def classify_and_stream():
     global cap, detecting, current_frame, detection_buffer, last_detect_time, latest_result, mp_holistic
 
-    frame_interval = 0.2  # seconds between processing (5 FPS)
-    last_frame_time = 0
-
     cap = cv2.VideoCapture(0)
-    cap.set(cv2.CAP_PROP_FRAME_WIDTH, 960)
-    cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 540)
+    cap.set(cv2.CAP_PROP_FRAME_WIDTH, 1920)
+    cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 1080)
 
     holistic = mp_holistic.Holistic(
     min_detection_confidence=0.5,
@@ -57,7 +58,7 @@ def classify_and_stream():
         label_text, confidence, frame = extract_features_from_frame(frame, model, rev_label_map, holistic)
 
         # Just show frame without running inference
-        frame = cv2.resize(frame, (960, 540)) 
+        frame = cv2.resize(frame, (1920, 1080)) 
         with frame_lock:
             current_frame = frame.copy()
 
@@ -90,9 +91,20 @@ def classify_and_stream():
 
 
 
-def send_to_stage2(sequence):
-    print(f"[Stage2] Sequence dikirim: {sequence}")
-    # requests.post('http://stage2/endpoint', json={"sequence": sequence})
+def send_to_stage2(sequence):  # 📌 Ganti isi fungsi
+    def process_stage2(seq):
+        print(f"[Stage2] Sequence dikirim: {seq}")
+        sentence = " ".join(seq)
+        corrected = correct_spelling(sentence)
+        rephrased = rephrase_sentence(corrected)
+        print(f"[Stage2] Original   : {sentence}")
+        print(f"[Stage2] Corrected  : {corrected}")
+        print(f"[Stage2] Rephrased  : {rephrased}")
+
+        with final_result_lock:  # 📌 Simpan hasil untuk bisa ditampilkan
+            final_result["rephrased"] = rephrased
+
+    threading.Thread(target=process_stage2, args=(sequence,), daemon=True).start()
 
 
 @app.route('/')
@@ -152,6 +164,12 @@ def status():
     with result_lock:
         print("DEBUG:", latest_result)  # Debug log ke console
         return jsonify(latest_result)
+    
+
+@app.route('/final_result')  
+def final_result_api():      
+    with final_result_lock:
+        return jsonify(final_result)
 
 
 if __name__ == '__main__':
