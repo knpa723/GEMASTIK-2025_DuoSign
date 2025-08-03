@@ -9,6 +9,9 @@ tokenizers==0.21.2
 # === SymSpell Spell Correction ===
 symspellpy==6.9.0
 
+# === Google Gemini API ===
+google-generativeai==0.4.1
+
 # === Optional: TTS (Coqui TTS jika ingin aktifkan TTS) ===
 # TTS==0.22.0  # Uncomment jika ingin pakai TTS dari Coqui
 
