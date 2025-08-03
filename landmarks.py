@@ -1,17 +1,25 @@
-import numpy as np
 import cv2
+import numpy as np
+import tensorflow as tf
 from collections import deque
 import mediapipe as mp
 from mediapipe.framework.formats import landmark_pb2
 
-# Init MediaPipe
-mp_holistic = mp.solutions.holistic
-mp_drawing = mp.solutions.drawing_utils
-pose_indices = range(11, 17)
+# Load model & label map
+model = tf.keras.models.load_model("best_model.h5")
+label_map = np.load("label_map.npy", allow_pickle=True).item()
+rev_label_map = {v: k for k, v in label_map.items()}
+
+# Setup
 MAX_SEQ_LENGTH = 30
+pose_indices = range(11, 17)
 sequence = deque(maxlen=MAX_SEQ_LENGTH)
 
-# === Ekstraksi fitur dari hasil landmark ===
+# MediaPipe
+mp_drawing = mp.solutions.drawing_utils
+mp_holistic = mp.solutions.holistic
+
+# Feature extractor
 def extract_features(results):
     feat = []
 
@@ -40,8 +48,7 @@ def extract_features(results):
 
     return np.array(feat)
 
-
-# === Gambar landmark tangan dan sebagian pose (tanpa wajah) ===
+# Drawing function (same as yours)
 def draw_landmarks_only_pose_and_hands(image, results):
     annotated = image.copy()
     MODIFIED_POSE_CONNECTION = sorted(list(mp_holistic.POSE_CONNECTIONS))[10:]
@@ -86,55 +93,56 @@ def draw_landmarks_only_pose_and_hands(image, results):
 
     return annotated
 
+# Webcam loop
+cap = cv2.VideoCapture(1)
 
-# === Fungsi utama untuk dipanggil dari app.py ===
-def extract_features_from_frame(frame_bgr, model, label_list):
-    with mp_holistic.Holistic(
-        min_detection_confidence=0.5,
-        min_tracking_confidence=0.5
-    ) as holistic:
+with mp_holistic.Holistic(min_detection_confidence=0.5, min_tracking_confidence=0.5) as holistic:
+    while cap.isOpened():
+        ret, frame = cap.read()
+        if not ret:
+            break
 
-        rgb = cv2.cvtColor(frame_bgr, cv2.COLOR_BGR2RGB)
+        rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
         rgb.flags.writeable = False
         results = holistic.process(rgb)
         rgb.flags.writeable = True
 
-        frame_with_skeleton = draw_landmarks_only_pose_and_hands(frame_bgr, results)
-
-        # Check keberadaan landmark untuk proses prediksi
+        #frame = cv2.resize(frame, (480, 270))
+         # Draw landmarks
+        frame = draw_landmarks_only_pose_and_hands(frame, results)
+        frame = cv2.flip(frame, 1)
+        # Check if both hands and arm landmarks are present
         if (
             results.pose_landmarks or
-            results.left_hand_landmarks or
-            results.right_hand_landmarks
+            (results.left_hand_landmarks or
+            results.right_hand_landmarks)
         ):
+            # Extract & append features
             feature_vector = extract_features(results)
             sequence.append(feature_vector)
 
+            # Predict only if sequence is full
             if len(sequence) == MAX_SEQ_LENGTH:
                 input_data = np.expand_dims(np.array(sequence), axis=0)
                 pred = model.predict(input_data, verbose=0)[0]
-                class_id = int(np.argmax(pred))
-                confidence = float(np.max(pred))
+                class_id = np.argmax(pred)
+                confidence = np.max(pred)
 
-                if confidence > 0.5:
-                    label = label_list[class_id]
-                    
-                    # Tambahkan teks ke frame (pojok kiri atas)
-                    text = f"{label} ({confidence:.2f})"
+                if confidence > 0.99:
+                    label = rev_label_map[class_id]
                     cv2.putText(
-                        frame_with_skeleton,
-                        text,
-                        (10, 40),  # posisi teks
-                        cv2.FONT_HERSHEY_SIMPLEX,
-                        1.2,            # ukuran font
-                        (0, 255, 0),    # warna hijau terang
-                        3,              # ketebalan
-                        cv2.LINE_AA
+                        frame, f"{label} ({confidence:.2f})", (10, 40),
+                        cv2.FONT_HERSHEY_SIMPLEX, 1.2, (0, 255, 0), 2, cv2.LINE_AA
                     )
+        else:
+            # Clear sequence if incomplete body parts
+            sequence.clear()
 
-                    return label, confidence, frame_with_skeleton
 
+        cv2.imshow('Gesture Detection', frame)
 
-        # Jika tidak terdeteksi
-        sequence.clear()
-        return None, 0.0, frame_with_skeleton
+        if cv2.waitKey(5) & 0xFF == 27:  # ESC to quit
+            break
+
+cap.release()
+cv2.destroyAllWindows()
