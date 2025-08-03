@@ -10,8 +10,13 @@ from functools import lru_cache
 
 import google.generativeai as genai
 
+from dotenv import load_dotenv
+
+# === Load .env ===
+load_dotenv()
+GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
+
 # ========== Setup Gemini ==========
-GEMINI_API_KEY = "AIzaSyAWmvBI45UXKHgm8vvlzRe6S__fXmqEQio"
 genai.configure(api_key=GEMINI_API_KEY)
 
 # Load Gemini Pro model

@@ -22,3 +22,7 @@ symspellpy==6.9.0
 
 # === Sistem Utility (opsional, tapi direkomendasikan untuk stabilitas IO/CLI) ===
 #tqdm==4.67.1
+
+google-generativeai==0.4.1
+
+python-dotenv
