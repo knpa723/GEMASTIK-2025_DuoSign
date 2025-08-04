@@ -56,7 +56,17 @@ def correct_spelling(text):
 # ========== Step 4: Koreksi Grammar & Susun Ulang ==========
 @lru_cache(maxsize=128)
 def rephrase_sentence(text):
-    prompt = f"Perbaiki tata bahasa dan buat lebih natural dalam bahasa Indonesia. Jangan berikan penjelasan apapun ataupun hal lainnya. Kirimkan hanya teks yang sudah benar-benar sesuai tata bahasanya:\n\"{text}\""
+    prompt = f"""
+                Perbaiki tata bahasa dan ejaan teks Bahasa Indonesia berikut tanpa mengubah makna aslinya.
+
+                - Jika teks hanya terdiri dari satu kata: cukup koreksi ejaan dan tata bahasanya jika perlu, tanpa menambahkan atau mengurangi makna.
+                - Jika teks terdiri dari dua kata atau lebih: koreksi tata bahasa dan ejaan, lalu susun ulang agar menjadi kalimat yang padu dan alami, namun jangan menambahkan informasi yang tidak ada atau mengubah maknanya.
+                - Jika ada teks berulang pahami dulu konteksnya, jika tidak memiliki makna penting, hapus teks tersebut.
+                - Jika ada teks yang tidak relevan dengan kata sebelumnya atau setelahnya, maka pahami konteksnya, jika tidak memiliki makna penting, hapus teks tersebut.
+                - Jangan berikan penjelasan, komentar, atau tambahan apa pun. Hanya kirim hasil koreksi kalimat saja.
+
+                Teks: "{text}"
+                """
     try:
         response = gemini_model.generate_content(prompt)
         return response.text.strip()
@@ -96,4 +106,5 @@ def main():
 
 # ========== Jalankan Program ==========
 if __name__ == "__main__":
-    main()
+    # main()
+    __all__ = ["correct_spelling", "rephrase_sentence"]
