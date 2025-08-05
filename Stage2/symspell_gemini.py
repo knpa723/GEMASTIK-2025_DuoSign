@@ -64,6 +64,7 @@ def rephrase_sentence(text):
                 - Jika ada teks berulang pahami dulu konteksnya, jika tidak memiliki makna penting, hapus teks tersebut.
                 - Jika ada teks yang tidak relevan dengan kata sebelumnya atau setelahnya, maka pahami konteksnya, jika tidak memiliki makna penting, hapus teks tersebut.
                 - Jangan berikan penjelasan, komentar, atau tambahan apa pun. Hanya kirim hasil koreksi kalimat saja.
+                - Jika ada dua kata muncul berurutan, cek apakah kata tersebut digunakan untuk menunjukkan kelipatan suatu benda (Jika iya tambahkan '-' diantara keduanya), jika bukan menunjukkan kelipatan gunakan saja satu kata tersebut
 
                 Teks: "{text}"
                 """
