@@ -41,7 +41,7 @@ last_label = None
 repeat_count = 0
 
 def classify_and_stream():
-    global cap, detecting, current_frame, detection_buffer, last_detect_time, latest_result, mp_holistic
+    global cap, detecting, current_frame, detection_buffer, last_detect_time, latest_result, mp_holistic, last_label, repeat_count
 
     cap = cv2.VideoCapture(0)
     cap.set(cv2.CAP_PROP_FRAME_WIDTH, 1920)
@@ -71,7 +71,7 @@ def classify_and_stream():
 
         # Lanjutkan buffer logika
         if confidence > 0.7:
-            if label_text == last_label:
+            if last_label and (label_text == last_label):
                 repeat_count += 1
             else:
                 repeat_count = 1  # Reset karena label baru
@@ -80,7 +80,7 @@ def classify_and_stream():
             if repeat_count <= 2:
                 detection_buffer.append(label_text)
                 last_detect_time = current_time
-                
+
             if len(detection_buffer) >= 5:
                 send_to_stage2(detection_buffer.copy())
                 detection_buffer.clear()
