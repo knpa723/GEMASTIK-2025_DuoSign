@@ -37,6 +37,9 @@ mp_holistic = mp.solutions.holistic
 final_result = {"original": "", "corrected": "", "rephrased": ""}
 final_result_lock = threading.Lock()  
 
+last_label = None
+repeat_count = 0
+
 def classify_and_stream():
     global cap, detecting, current_frame, detection_buffer, last_detect_time, latest_result, mp_holistic
 
@@ -68,11 +71,21 @@ def classify_and_stream():
 
         # Lanjutkan buffer logika
         if confidence > 0.7:
-            detection_buffer.append(label_text)
-            last_detect_time = current_time
+            if label_text == last_label:
+                repeat_count += 1
+            else:
+                repeat_count = 1  # Reset karena label baru
+                last_label = label_text
+
+            if repeat_count <= 2:
+                detection_buffer.append(label_text)
+                last_detect_time = current_time
+                
             if len(detection_buffer) >= 5:
                 send_to_stage2(detection_buffer.copy())
                 detection_buffer.clear()
+                repeat_count = 0  # reset setelah kirim
+                last_label = None
         else:
             # Untuk buffer logika saja, tidak menyentuh latest_result
             label_text = "Tidak yakin"
